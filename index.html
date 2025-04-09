@@ -128,9 +128,11 @@
         return;
       }
 
+      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté disponible y sea accesible en la misma carpeta
       try {
-        const pdfDoc = await PDFLib.PDFDocument.create();
-        const page = pdfDoc.addPage([595, 842]); // tamaño A4
+        const existingPdfBytes = await fetch(url).then(res => res.arrayBuffer());
+        const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
+        const page = pdfDoc.getPages()[0];
         const { width, height } = page.getSize();
         const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
         const fontSize = 10;
@@ -145,22 +147,43 @@
         let startY = height - 160;
 
         // Encabezado de la tabla
-        page.drawText("Descripción", { x: 50, y: startY, size: fontSize, font });
-        page.drawText("Cantidad", { x: 250, y: startY, size: fontSize, font });
-        page.drawText("Unidad", { x: 300, y: startY, size: fontSize, font });
-        page.drawText("Precio", { x: 380, y: startY, size: fontSize, font });
-        page.drawText("Subtotal", { x: 460, y: startY, size: fontSize, font });
-        startY -= 20;
+        const tableX = 50;
+        const tableWidth = 500;
+        const rowHeight = 18;
+        
+        // Títulos de la tabla
+        page.drawText("Descripción", { x: tableX, y: startY, size: fontSize, font });
+        page.drawText("Cantidad", { x: tableX + 200, y: startY, size: fontSize, font });
+        page.drawText("Unidad", { x: tableX + 250, y: startY, size: fontSize, font });
+        page.drawText("Precio", { x: tableX + 320, y: startY, size: fontSize, font });
+        page.drawText("Subtotal", { x: tableX + 400, y: startY, size: fontSize, font });
+        startY -= rowHeight;
 
-        // Tabla con los productos
+        // Dibujar líneas de la tabla
+        page.drawLine({
+          start: { x: tableX, y: startY + rowHeight },
+          end: { x: tableX + tableWidth, y: startY + rowHeight },
+          color: rgb(0, 0, 0),
+          thickness: 1,
+        });
+
+        // Agregar las partidas de productos
         for (const p of productos) {
           if (startY < 100) break; // evita escribir sobre el pie del PDF
-          page.drawText(p.descripcion, { x: 50, y: startY, size: fontSize, font });
-          page.drawText(p.cantidad.toString(), { x: 250, y: startY, size: fontSize, font });
-          page.drawText(p.unidad, { x: 300, y: startY, size: fontSize, font });
-          page.drawText(`$${p.precio.toFixed(2)}`, { x: 380, y: startY, size: fontSize, font });
-          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 460, y: startY, size: fontSize, font });
-          startY -= 18;
+          page.drawText(p.descripcion, { x: tableX, y: startY, size: fontSize, font });
+          page.drawText(p.cantidad.toString(), { x: tableX + 200, y: startY, size: fontSize, font });
+          page.drawText(p.unidad, { x: tableX + 250, y: startY, size: fontSize, font });
+          page.drawText(`$${p.precio.toFixed(2)}`, { x: tableX + 320, y: startY, size: fontSize, font });
+          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: tableX + 400, y: startY, size: fontSize, font });
+          startY -= rowHeight;
+
+          // Dibujar líneas de cada fila
+          page.drawLine({
+            start: { x: tableX, y: startY + rowHeight },
+            end: { x: tableX + tableWidth, y: startY + rowHeight },
+            color: rgb(0, 0, 0),
+            thickness: 1,
+          });
         }
 
         // Total
@@ -169,7 +192,7 @@
         if (incluirIVA) {
           totalConIVA = total * 1.16; // Asumiendo un IVA del 16%
         }
-        
+
         page.drawText(`TOTAL: $${totalConIVA.toFixed(2)}`, { x: 400, y: startY - 20, size: fontSize + 1, font });
 
         // Guardar el PDF
