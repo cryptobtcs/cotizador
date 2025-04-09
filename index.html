@@ -127,7 +127,7 @@
         return;
       }
 
-      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté en la misma carpeta que tu HTML
+      const url = "plantilla.pdf"; // Ruta a tu plantilla PDF
 
       try {
         const existingPdfBytes = await fetch(url).then(res => {
@@ -142,8 +142,8 @@
         const fontSize = 10;
         const boldFont = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold); // Fuente en negrita
 
-        // Ajustando la posición para mover todo 3 líneas más abajo
-        const startY = height - 100;
+        // Ajustando la posición para mover todo 4 líneas más abajo
+        const startY = height - 150; // Comienza 4 líneas más abajo de donde estaba
 
         // Folio
         page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, {
