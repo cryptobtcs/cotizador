@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Cotizador PDF</title>
   <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
   <script src="https://unpkg.com/file-saver"></script>
@@ -59,14 +59,14 @@
 <body>
   <div class="container">
     <h1>Generador de Cotizaciones</h1>
-    <input type="text" id="cliente" placeholder="Nombre del Cliente">
-    <input type="date" id="fecha">
+    <input type="text" id="cliente" placeholder="Nombre del Cliente" />
+    <input type="date" id="fecha" />
 
     <h3>Agregar Producto/Servicio</h3>
-    <input type="text" id="descripcion" placeholder="Descripción">
-    <input type="number" id="cantidad" placeholder="Cantidad">
-    <input type="text" id="unidad" placeholder="Unidad (ej. pieza, m2, kg)">
-    <input type="number" id="precio" placeholder="Precio Unitario">
+    <input type="text" id="descripcion" placeholder="Descripción" />
+    <input type="number" id="cantidad" placeholder="Cantidad" />
+    <input type="text" id="unidad" placeholder="Unidad (ej. pieza, m2, kg)" />
+    <input type="number" id="precio" placeholder="Precio Unitario" />
     <button class="btn" onclick="agregarProducto()">Agregar</button>
 
     <table id="tabla">
@@ -95,6 +95,7 @@
       const cantidad = parseFloat(document.getElementById("cantidad").value);
       const unidad = document.getElementById("unidad").value;
       const precio = parseFloat(document.getElementById("precio").value);
+
       if (!descripcion || !cantidad || !unidad || !precio) return alert("Faltan datos");
 
       const subtotal = cantidad * precio;
@@ -105,6 +106,7 @@
 
       actualizarTotal();
 
+      // Limpiar campos
       document.getElementById("descripcion").value = "";
       document.getElementById("cantidad").value = "";
       document.getElementById("unidad").value = "";
@@ -119,42 +121,54 @@
     async function generarPDF() {
       const cliente = document.getElementById("cliente").value;
       const fecha = document.getElementById("fecha").value;
-      if (!cliente || !fecha || productos.length === 0) return alert("Faltan datos");
 
-      const url = "plantilla.pdf"; // Reemplazar con la URL del PDF en GitHub
-      const existingPdfBytes = await fetch(url).then(res => res.arrayBuffer());
-      const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
-      const pages = pdfDoc.getPages();
-      const page = pages[0];
-      const { width, height } = page.getSize();
-
-      const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-      const fontSize = 10;
-
-      page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, { x: 50, y: height - 80, size: fontSize, font });
-      page.drawText(`Fecha: ${fecha}`, { x: 400, y: height - 80, size: fontSize, font });
-      page.drawText(`Cliente: ${cliente}`, { x: 50, y: height - 100, size: fontSize, font });
-
-      let startY = height - 130;
-      for (const p of productos) {
-        if (startY < 100) break;
-        page.drawText(p.descripcion, { x: 50, y: startY, size: fontSize, font });
-        page.drawText(p.cantidad.toString(), { x: 250, y: startY, size: fontSize, font });
-        page.drawText(p.unidad, { x: 300, y: startY, size: fontSize, font });
-        page.drawText(`$${p.precio.toFixed(2)}`, { x: 380, y: startY, size: fontSize, font });
-        page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 460, y: startY, size: fontSize, font });
-        startY -= 18;
+      if (!cliente || !fecha || productos.length === 0) {
+        alert("Faltan datos");
+        return;
       }
 
-      const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
-      page.drawText(`TOTAL: $${total.toFixed(2)}`, { x: 400, y: startY - 20, size: fontSize + 1, font });
+      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté en la misma carpeta que tu HTML
 
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
+      try {
+        const existingPdfBytes = await fetch(url).then(res => {
+          if (!res.ok) throw new Error("No se pudo cargar la plantilla PDF");
+          return res.arrayBuffer();
+        });
 
-      folio++;
-      localStorage.setItem("folio", folio);
+        const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
+        const page = pdfDoc.getPages()[0];
+        const { width, height } = page.getSize();
+        const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+        const fontSize = 10;
+
+        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, { x: 50, y: height - 80, size: fontSize, font });
+        page.drawText(`Fecha: ${fecha}`, { x: 400, y: height - 80, size: fontSize, font });
+        page.drawText(`Cliente: ${cliente}`, { x: 50, y: height - 100, size: fontSize, font });
+
+        let startY = height - 130;
+        for (const p of productos) {
+          if (startY < 100) break; // evita escribir sobre el pie del PDF
+          page.drawText(p.descripcion, { x: 50, y: startY, size: fontSize, font });
+          page.drawText(p.cantidad.toString(), { x: 250, y: startY, size: fontSize, font });
+          page.drawText(p.unidad, { x: 300, y: startY, size: fontSize, font });
+          page.drawText(`$${p.precio.toFixed(2)}`, { x: 380, y: startY, size: fontSize, font });
+          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 460, y: startY, size: fontSize, font });
+          startY -= 18;
+        }
+
+        const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
+        page.drawText(`TOTAL: $${total.toFixed(2)}`, { x: 400, y: startY - 20, size: fontSize + 1, font });
+
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
+
+        folio++;
+        localStorage.setItem("folio", folio);
+      } catch (error) {
+        alert("Error al generar PDF: " + error.message);
+        console.error(error);
+      }
     }
   </script>
 </body>
