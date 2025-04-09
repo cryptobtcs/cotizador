@@ -121,37 +121,41 @@
     async function generarPDF() {
       const cliente = document.getElementById("cliente").value;
       const fecha = document.getElementById("fecha").value;
-      const incluirIVA = confirm("¿La cotización lleva IVA?");
 
       if (!cliente || !fecha || productos.length === 0) {
         alert("Faltan datos");
         return;
       }
 
-      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté disponible y sea accesible en la misma carpeta
+      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté en la misma carpeta que tu HTML
+
       try {
-        const existingPdfBytes = await fetch(url).then(res => res.arrayBuffer());
+        const existingPdfBytes = await fetch(url).then(res => {
+          if (!res.ok) throw new Error("No se pudo cargar la plantilla PDF");
+          return res.arrayBuffer();
+        });
+
         const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
         const page = pdfDoc.getPages()[0];
         const { width, height } = page.getSize();
         const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
         const fontSize = 10;
 
-        // Encabezado con cliente, fecha y leyenda
-        page.drawText(`Cliente: ${cliente}`, { x: 50, y: height - 80, size: fontSize, font });
-        page.drawText(`Fecha: ${fecha}`, { x: 50, y: height - 100, size: fontSize, font });
-        page.drawText("Cotización válida una vez pagada y aceptada de conformidad", { x: 50, y: height - 120, size: fontSize, font });
-        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, { x: 400, y: height - 80, size: fontSize, font });
+        // Información básica
+        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, { x: 50, y: height - 80, size: fontSize, font });
+        page.drawText(`Fecha: ${fecha}`, { x: 400, y: height - 80, size: fontSize, font });
+        page.drawText(`Cliente: ${cliente}`, { x: 50, y: height - 100, size: fontSize, font });
 
-        // Espacio para la tabla
+        // Leyenda sobre aceptación de cotización
+        const leyenda = "Una vez pagada la cotización, se considera aceptado el producto o servicio.";
+        page.drawText(leyenda, { x: 50, y: height - 130, size: fontSize, font });
+
         let startY = height - 160;
 
         // Encabezado de la tabla
         const tableX = 50;
         const tableWidth = 500;
         const rowHeight = 18;
-        
-        // Títulos de la tabla
         page.drawText("Descripción", { x: tableX, y: startY, size: fontSize, font });
         page.drawText("Cantidad", { x: tableX + 200, y: startY, size: fontSize, font });
         page.drawText("Unidad", { x: tableX + 250, y: startY, size: fontSize, font });
@@ -159,43 +163,28 @@
         page.drawText("Subtotal", { x: tableX + 400, y: startY, size: fontSize, font });
         startY -= rowHeight;
 
-        // Dibujar líneas de la tabla
+        // Dibujar línea debajo del encabezado
         page.drawLine({
           start: { x: tableX, y: startY + rowHeight },
           end: { x: tableX + tableWidth, y: startY + rowHeight },
-          color: rgb(0, 0, 0),
+          color: PDFLib.rgb(0, 0, 0),
           thickness: 1,
         });
 
-        // Agregar las partidas de productos
+        // Insertar los productos en la tabla
         for (const p of productos) {
-          if (startY < 100) break; // evita escribir sobre el pie del PDF
+          if (startY < 100) break;
           page.drawText(p.descripcion, { x: tableX, y: startY, size: fontSize, font });
           page.drawText(p.cantidad.toString(), { x: tableX + 200, y: startY, size: fontSize, font });
           page.drawText(p.unidad, { x: tableX + 250, y: startY, size: fontSize, font });
           page.drawText(`$${p.precio.toFixed(2)}`, { x: tableX + 320, y: startY, size: fontSize, font });
           page.drawText(`$${p.subtotal.toFixed(2)}`, { x: tableX + 400, y: startY, size: fontSize, font });
           startY -= rowHeight;
-
-          // Dibujar líneas de cada fila
-          page.drawLine({
-            start: { x: tableX, y: startY + rowHeight },
-            end: { x: tableX + tableWidth, y: startY + rowHeight },
-            color: rgb(0, 0, 0),
-            thickness: 1,
-          });
         }
 
-        // Total
         const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
-        let totalConIVA = total;
-        if (incluirIVA) {
-          totalConIVA = total * 1.16; // Asumiendo un IVA del 16%
-        }
+        page.drawText(`TOTAL: $${total.toFixed(2)}`, { x: 400, y: startY - 20, size: fontSize + 1, font });
 
-        page.drawText(`TOTAL: $${totalConIVA.toFixed(2)}`, { x: 400, y: startY - 20, size: fontSize + 1, font });
-
-        // Guardar el PDF
         const pdfBytes = await pdfDoc.save();
         const blob = new Blob([pdfBytes], { type: "application/pdf" });
         saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
