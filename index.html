@@ -127,7 +127,7 @@
         return;
       }
 
-      const url = "plantilla.pdf"; // Ruta a tu plantilla PDF
+      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté en la misma carpeta que tu HTML
 
       try {
         const existingPdfBytes = await fetch(url).then(res => {
@@ -140,116 +140,54 @@
         const { width, height } = page.getSize();
         const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
         const fontSize = 10;
-        const boldFont = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold); // Fuente en negrita
 
-        // Ajustando la posición para mover todo 4 líneas más abajo
-        const startY = height - 150; // Comienza 4 líneas más abajo de donde estaba
+        // Empieza 4 líneas más abajo
+        let startY = height - 130;
 
-        // Folio
-        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, {
-          x: 50,
-          y: startY,
-          size: fontSize,
-          font: boldFont,
-          color: PDFLib.rgb(1, 0, 0) // Color rojo
-        });
+        // Agregar folio en rojo y negritas
+        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(1, 0, 0), bold: true });
+        startY -= 20;
 
-        // Cliente
-        page.drawText("Cliente:", {
-          x: 50,
-          y: startY - 20,
-          size: fontSize,
-          font: boldFont
-        });
-        page.drawText(cliente, {
-          x: 120,
-          y: startY - 20,
-          size: fontSize,
-          font: font
-        });
+        // Agregar cliente en negritas
+        page.drawText(`Cliente:`, { x: 50, y: startY, size: fontSize, font, bold: true });
+        page.drawText(cliente, { x: 120, y: startY, size: fontSize, font });
+        startY -= 20;
 
-        // Fecha
-        page.drawText("Fecha:", {
-          x: 50,
-          y: startY - 40,
-          size: fontSize,
-          font: boldFont
-        });
-        page.drawText(fecha, {
-          x: 120,
-          y: startY - 40,
-          size: fontSize,
-          font: font
-        });
+        // Agregar fecha en negritas
+        page.drawText(`Fecha:`, { x: 50, y: startY, size: fontSize, font, bold: true });
+        page.drawText(fecha, { x: 120, y: startY, size: fontSize, font });
+        startY -= 40; // Espacio para la leyenda
 
-        // Leyenda
-        page.drawText("Una vez pagada la cotización, se da por aceptado de conformidad el producto o servicio.", {
-          x: 50,
-          y: startY - 60,
-          size: fontSize,
-          font: font,
-          maxWidth: 500
-        });
+        // Leyenda de aceptación
+        page.drawText(`Una vez pagada la cotización se da por aceptado de conformidad el producto o servicio.`, { x: 50, y: startY, size: fontSize, font });
+        startY -= 30;
 
-        // Tabla de productos
-        let tableStartY = startY - 90; // Empieza la tabla un poco más abajo
-        const tableHeaders = ["Descripción", "Cantidad", "Unidad", "Precio", "Subtotal"];
-        const cellPadding = 5;
+        // Títulos de la tabla
+        page.drawText("Descripción", { x: 50, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Cantidad", { x: 200, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Unidad", { x: 300, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Precio", { x: 380, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Subtotal", { x: 460, y: startY, size: fontSize, font, bold: true });
+        startY -= 20;
 
-        // Dibuja encabezados
-        const headerXPositions = [50, 250, 300, 380, 460]; // Posiciones horizontales de las celdas
-        tableHeaders.forEach((header, i) => {
-          page.drawText(header, {
-            x: headerXPositions[i],
-            y: tableStartY,
-            size: fontSize,
-            font: boldFont
-          });
-        });
-
-        tableStartY -= 20; // Espacio debajo del encabezado
-
-        // Dibuja las filas de productos
+        // Agregar productos en la tabla
         for (const p of productos) {
-          if (tableStartY < 100) break; // Evita escribir sobre el pie del PDF
-
-          page.drawText(p.descripcion, { x: 50, y: tableStartY, size: fontSize, font: font });
-          page.drawText(p.cantidad.toString(), { x: 250, y: tableStartY, size: fontSize, font: font });
-          page.drawText(p.unidad, { x: 300, y: tableStartY, size: fontSize, font: font });
-          page.drawText(`$${p.precio.toFixed(2)}`, { x: 380, y: tableStartY, size: fontSize, font: font });
-          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 460, y: tableStartY, size: fontSize, font: font });
-
-          tableStartY -= 18; // Espaciado entre filas
+          if (startY < 100) break; // evita escribir sobre el pie del PDF
+          page.drawText(p.descripcion, { x: 50, y: startY, size: fontSize, font });
+          page.drawText(p.cantidad.toString(), { x: 200, y: startY, size: fontSize, font });
+          page.drawText(p.unidad, { x: 300, y: startY, size: fontSize, font });
+          page.drawText(`$${p.precio.toFixed(2)}`, { x: 380, y: startY, size: fontSize, font });
+          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 460, y: startY, size: fontSize, font });
+          startY -= 18;
         }
 
-        // Total
         const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
-        page.drawText(`TOTAL: $${total.toFixed(2)}`, {
-          x: 400,
-          y: tableStartY - 20,
-          size: fontSize + 1,
-          font: boldFont
-        });
 
-        // Pregunta si lleva IVA
+        // Calcular el IVA si corresponde
         const iva = confirm("¿La cotización incluye IVA?");
-        if (iva) {
-          const ivaAmount = total * 0.16; // Calcula el IVA
-          page.drawText(`IVA (16%): $${ivaAmount.toFixed(2)}`, {
-            x: 400,
-            y: tableStartY - 40,
-            size: fontSize + 1,
-            font: boldFont
-          });
-          page.drawText(`TOTAL CON IVA: $${(total + ivaAmount).toFixed(2)}`, {
-            x: 400,
-            y: tableStartY - 60,
-            size: fontSize + 1,
-            font: boldFont
-          });
-        }
+        const totalConIva = iva ? total * 1.16 : total; // 16% IVA
+        page.drawText(`TOTAL: $${totalConIva.toFixed(2)}`, { x: 400, y: startY - 20, size: fontSize + 1, font });
 
-        // Guarda el PDF
         const pdfBytes = await pdfDoc.save();
         const blob = new Blob([pdfBytes], { type: "application/pdf" });
         saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
