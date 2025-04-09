@@ -1,144 +1,266 @@
-<script>
-  async function generarPDF() {
-    const cliente = document.getElementById("cliente").value;
-    const fecha = document.getElementById("fecha").value;
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cotizador PDF</title>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script src="https://unpkg.com/file-saver"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+      color: #111;
+    }
+    h1 {
+      color: #b00000;
+    }
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    input, select {
+      padding: 10px;
+      margin: 5px;
+      width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #b00000;
+      color: white;
+    }
+    .btn {
+      background: #b00000;
+      color: white;
+      padding: 10px 20px;
+      margin-top: 10px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #900000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Generador de Cotizaciones</h1>
+    <input type="text" id="cliente" placeholder="Nombre del Cliente" />
+    <input type="date" id="fecha" />
 
-    if (!cliente || !fecha || productos.length === 0) {
-      alert("Faltan datos");
-      return;
+    <h3>Agregar Producto/Servicio</h3>
+    <input type="text" id="descripcion" placeholder="Descripción" />
+    <input type="number" id="cantidad" placeholder="Cantidad" />
+    <input type="text" id="unidad" placeholder="Unidad (ej. pieza, m2, kg)" />
+    <input type="number" id="precio" placeholder="Precio Unitario" />
+    <button class="btn" onclick="agregarProducto()">Agregar</button>
+
+    <table id="tabla">
+      <thead>
+        <tr>
+          <th>Descripción</th>
+          <th>Cantidad</th>
+          <th>Unidad</th>
+          <th>Precio</th>
+          <th>Subtotal</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h3 id="total"></h3>
+    <button class="btn" onclick="generarPDF()">Descargar PDF</button>
+  </div>
+
+  <script>
+    let productos = [];
+    let folio = parseInt(localStorage.getItem("folio") || "1");
+
+    function agregarProducto() {
+      const descripcion = document.getElementById("descripcion").value;
+      const cantidad = parseFloat(document.getElementById("cantidad").value);
+      const unidad = document.getElementById("unidad").value;
+      const precio = parseFloat(document.getElementById("precio").value);
+
+      if (!descripcion || !cantidad || !unidad || !precio) return alert("Faltan datos");
+
+      const subtotal = cantidad * precio;
+      productos.push({ descripcion, cantidad, unidad, precio, subtotal });
+
+      const row = `<tr><td>${descripcion}</td><td>${cantidad}</td><td>${unidad}</td><td>$${precio.toFixed(2)}</td><td>$${subtotal.toFixed(2)}</td></tr>`;
+      document.querySelector("#tabla tbody").innerHTML += row;
+
+      actualizarTotal();
+
+      // Limpiar campos
+      document.getElementById("descripcion").value = "";
+      document.getElementById("cantidad").value = "";
+      document.getElementById("unidad").value = "";
+      document.getElementById("precio").value = "";
     }
 
-    const url = "plantilla.pdf"; // Asegúrate de que este archivo esté en la misma carpeta que tu HTML
+    function actualizarTotal() {
+      const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
+      document.getElementById("total").innerText = `Total: $${total.toFixed(2)}`;
+    }
 
-    try {
-      const existingPdfBytes = await fetch(url).then(res => {
-        if (!res.ok) throw new Error("No se pudo cargar la plantilla PDF");
-        return res.arrayBuffer();
-      });
+    async function generarPDF() {
+      const cliente = document.getElementById("cliente").value;
+      const fecha = document.getElementById("fecha").value;
 
-      const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
-      const page = pdfDoc.getPages()[0];
-      const { width, height } = page.getSize();
-      const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-      const fontSize = 10;
-      const boldFont = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold); // Fuente en negrita
+      if (!cliente || !fecha || productos.length === 0) {
+        alert("Faltan datos");
+        return;
+      }
 
-      // Ajustando la posición para mover todo 3 líneas más abajo
-      const startY = height - 100;
+      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté en la misma carpeta que tu HTML
 
-      // Folio
-      page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, {
-        x: 50,
-        y: startY,
-        size: fontSize,
-        font: boldFont,
-        color: PDFLib.rgb(1, 0, 0) // Color rojo
-      });
+      try {
+        const existingPdfBytes = await fetch(url).then(res => {
+          if (!res.ok) throw new Error("No se pudo cargar la plantilla PDF");
+          return res.arrayBuffer();
+        });
 
-      // Cliente
-      page.drawText("Cliente:", {
-        x: 50,
-        y: startY - 20,
-        size: fontSize,
-        font: boldFont
-      });
-      page.drawText(cliente, {
-        x: 120,
-        y: startY - 20,
-        size: fontSize,
-        font: font
-      });
+        const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
+        const page = pdfDoc.getPages()[0];
+        const { width, height } = page.getSize();
+        const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+        const fontSize = 10;
+        const boldFont = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold); // Fuente en negrita
 
-      // Fecha
-      page.drawText("Fecha:", {
-        x: 50,
-        y: startY - 40,
-        size: fontSize,
-        font: boldFont
-      });
-      page.drawText(fecha, {
-        x: 120,
-        y: startY - 40,
-        size: fontSize,
-        font: font
-      });
+        // Ajustando la posición para mover todo 3 líneas más abajo
+        const startY = height - 100;
 
-      // Leyenda
-      page.drawText("Una vez pagada la cotización, se da por aceptado de conformidad el producto o servicio.", {
-        x: 50,
-        y: startY - 60,
-        size: fontSize,
-        font: font,
-        maxWidth: 500
-      });
+        // Folio
+        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, {
+          x: 50,
+          y: startY,
+          size: fontSize,
+          font: boldFont,
+          color: PDFLib.rgb(1, 0, 0) // Color rojo
+        });
 
-      // Tabla de productos
-      let tableStartY = startY - 90; // Empieza la tabla un poco más abajo
-      const tableHeaders = ["Descripción", "Cantidad", "Unidad", "Precio", "Subtotal"];
-      const cellPadding = 5;
-
-      // Dibuja encabezados
-      const headerXPositions = [50, 250, 300, 380, 460]; // Posiciones horizontales de las celdas
-      tableHeaders.forEach((header, i) => {
-        page.drawText(header, {
-          x: headerXPositions[i],
-          y: tableStartY,
+        // Cliente
+        page.drawText("Cliente:", {
+          x: 50,
+          y: startY - 20,
           size: fontSize,
           font: boldFont
         });
-      });
-
-      tableStartY -= 20; // Espacio debajo del encabezado
-
-      // Dibuja las filas de productos
-      for (const p of productos) {
-        if (tableStartY < 100) break; // Evita escribir sobre el pie del PDF
-
-        page.drawText(p.descripcion, { x: 50, y: tableStartY, size: fontSize, font: font });
-        page.drawText(p.cantidad.toString(), { x: 250, y: tableStartY, size: fontSize, font: font });
-        page.drawText(p.unidad, { x: 300, y: tableStartY, size: fontSize, font: font });
-        page.drawText(`$${p.precio.toFixed(2)}`, { x: 380, y: tableStartY, size: fontSize, font: font });
-        page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 460, y: tableStartY, size: fontSize, font: font });
-
-        tableStartY -= 18; // Espaciado entre filas
-      }
-
-      // Total
-      const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
-      page.drawText(`TOTAL: $${total.toFixed(2)}`, {
-        x: 400,
-        y: tableStartY - 20,
-        size: fontSize + 1,
-        font: boldFont
-      });
-
-      // Pregunta si lleva IVA
-      const iva = confirm("¿La cotización incluye IVA?");
-      if (iva) {
-        const ivaAmount = total * 0.16; // Calcula el IVA
-        page.drawText(`IVA (16%): $${ivaAmount.toFixed(2)}`, {
-          x: 400,
-          y: tableStartY - 40,
+        page.drawText(cliente, {
+          x: 120,
+          y: startY - 20,
           size: fontSize,
           font: font
         });
-        page.drawText(`TOTAL CON IVA: $${(total + ivaAmount).toFixed(2)}`, {
+
+        // Fecha
+        page.drawText("Fecha:", {
+          x: 50,
+          y: startY - 40,
+          size: fontSize,
+          font: boldFont
+        });
+        page.drawText(fecha, {
+          x: 120,
+          y: startY - 40,
+          size: fontSize,
+          font: font
+        });
+
+        // Leyenda
+        page.drawText("Una vez pagada la cotización, se da por aceptado de conformidad el producto o servicio.", {
+          x: 50,
+          y: startY - 60,
+          size: fontSize,
+          font: font,
+          maxWidth: 500
+        });
+
+        // Tabla de productos
+        let tableStartY = startY - 90; // Empieza la tabla un poco más abajo
+        const tableHeaders = ["Descripción", "Cantidad", "Unidad", "Precio", "Subtotal"];
+        const cellPadding = 5;
+
+        // Dibuja encabezados
+        const headerXPositions = [50, 250, 300, 380, 460]; // Posiciones horizontales de las celdas
+        tableHeaders.forEach((header, i) => {
+          page.drawText(header, {
+            x: headerXPositions[i],
+            y: tableStartY,
+            size: fontSize,
+            font: boldFont
+          });
+        });
+
+        tableStartY -= 20; // Espacio debajo del encabezado
+
+        // Dibuja las filas de productos
+        for (const p of productos) {
+          if (tableStartY < 100) break; // Evita escribir sobre el pie del PDF
+
+          page.drawText(p.descripcion, { x: 50, y: tableStartY, size: fontSize, font: font });
+          page.drawText(p.cantidad.toString(), { x: 250, y: tableStartY, size: fontSize, font: font });
+          page.drawText(p.unidad, { x: 300, y: tableStartY, size: fontSize, font: font });
+          page.drawText(`$${p.precio.toFixed(2)}`, { x: 380, y: tableStartY, size: fontSize, font: font });
+          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 460, y: tableStartY, size: fontSize, font: font });
+
+          tableStartY -= 18; // Espaciado entre filas
+        }
+
+        // Total
+        const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
+        page.drawText(`TOTAL: $${total.toFixed(2)}`, {
           x: 400,
-          y: tableStartY - 60,
+          y: tableStartY - 20,
           size: fontSize + 1,
           font: boldFont
         });
+
+        // Pregunta si lleva IVA
+        const iva = confirm("¿La cotización incluye IVA?");
+        if (iva) {
+          const ivaAmount = total * 0.16; // Calcula el IVA
+          page.drawText(`IVA (16%): $${ivaAmount.toFixed(2)}`, {
+            x: 400,
+            y: tableStartY - 40,
+            size: fontSize + 1,
+            font: boldFont
+          });
+          page.drawText(`TOTAL CON IVA: $${(total + ivaAmount).toFixed(2)}`, {
+            x: 400,
+            y: tableStartY - 60,
+            size: fontSize + 1,
+            font: boldFont
+          });
+        }
+
+        // Guarda el PDF
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
+
+        folio++;
+        localStorage.setItem("folio", folio);
+      } catch (error) {
+        alert("Error al generar PDF: " + error.message);
+        console.error(error);
       }
-
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
-      saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
-
-      folio++;
-      localStorage.setItem("folio", folio);
-    } catch (error) {
-      alert("Error al generar PDF: " + error.message);
-      console.error(error);
     }
-  }
-</script>
+  </script>
+</body>
+</html>
