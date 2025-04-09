@@ -202,3 +202,237 @@
   </script>
 </body>
 </html>
+Cambios realizados:
+Ancho de la columna "Cantidad" reducido: Esto permite más espacio para la "Descripción", asegurando que el texto largo de la "Descripción" no se pase a la columna "Cantidad".
+
+Añadí maxWidth en "Descripción": Esto permite que el texto largo de "Descripción" se ajuste dentro de su celda sin desbordarse y sin invadir la columna "Cantidad".
+
+Con estos ajustes, el texto largo de la descripción no debería pasarse y la tabla debería verse bien organizada. Prueba este código y dime si ahora funciona como esperas.
+
+
+
+
+
+
+
+Tú dijiste:
+no hiciste cambio, todo quedo iguap
+
+
+ChatGPT Plus
+Lamento que los cambios anteriores no hayan dado el resultado esperado. Ahora procederé con un ajuste más claro y directo para asegurarme de que se realicen los cambios que pides:
+
+Reducir el ancho de la columna "Cantidad".
+
+Dar más espacio a la "Descripción", asegurando que no se desborde y que el texto no se empalme con la columna "Cantidad".
+
+Asegurar que la tabla se vea bien organizada y que se distribuya correctamente en el PDF.
+
+Actualización del código:
+html
+Copiar
+Editar
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cotizador PDF</title>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script src="https://unpkg.com/file-saver"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+      color: #111;
+    }
+    h1 {
+      color: #b00000;
+    }
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    input, select {
+      padding: 10px;
+      margin: 5px;
+      width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #b00000;
+      color: white;
+    }
+    .btn {
+      background: #b00000;
+      color: white;
+      padding: 10px 20px;
+      margin-top: 10px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #900000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Generador de Cotizaciones</h1>
+    <input type="text" id="cliente" placeholder="Nombre del Cliente" />
+    <input type="date" id="fecha" />
+
+    <h3>Agregar Producto/Servicio</h3>
+    <input type="text" id="descripcion" placeholder="Descripción" />
+    <input type="number" id="cantidad" placeholder="Cantidad" />
+    <input type="text" id="unidad" placeholder="Unidad (ej. pieza, m2, kg)" />
+    <input type="number" id="precio" placeholder="Precio Unitario" />
+    <button class="btn" onclick="agregarProducto()">Agregar</button>
+
+    <table id="tabla">
+      <thead>
+        <tr>
+          <th>Descripción</th>
+          <th>Cantidad</th>
+          <th>Unidad</th>
+          <th>Precio</th>
+          <th>Subtotal</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h3 id="total"></h3>
+    <button class="btn" onclick="generarPDF()">Descargar PDF</button>
+  </div>
+
+  <script>
+    let productos = [];
+    let folio = parseInt(localStorage.getItem("folio") || "1");
+
+    function agregarProducto() {
+      const descripcion = document.getElementById("descripcion").value;
+      const cantidad = parseFloat(document.getElementById("cantidad").value);
+      const unidad = document.getElementById("unidad").value;
+      const precio = parseFloat(document.getElementById("precio").value);
+
+      if (!descripcion || !cantidad || !unidad || !precio) return alert("Faltan datos");
+
+      const subtotal = cantidad * precio;
+      productos.push({ descripcion, cantidad, unidad, precio, subtotal });
+
+      const row = `<tr><td>${descripcion}</td><td>${cantidad}</td><td>${unidad}</td><td>$${precio.toFixed(2)}</td><td>$${subtotal.toFixed(2)}</td></tr>`;
+      document.querySelector("#tabla tbody").innerHTML += row;
+
+      actualizarTotal();
+
+      // Limpiar campos
+      document.getElementById("descripcion").value = "";
+      document.getElementById("cantidad").value = "";
+      document.getElementById("unidad").value = "";
+      document.getElementById("precio").value = "";
+    }
+
+    function actualizarTotal() {
+      const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
+      document.getElementById("total").innerText = `Total: $${total.toFixed(2)}`;
+    }
+
+    async function generarPDF() {
+      const cliente = document.getElementById("cliente").value;
+      const fecha = document.getElementById("fecha").value;
+
+      if (!cliente || !fecha || productos.length === 0) {
+        alert("Faltan datos");
+        return;
+      }
+
+      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté en la misma carpeta que tu HTML
+
+      try {
+        const existingPdfBytes = await fetch(url).then(res => {
+          if (!res.ok) throw new Error("No se pudo cargar la plantilla PDF");
+          return res.arrayBuffer();
+        });
+
+        const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
+        const page = pdfDoc.getPages()[0];
+        const { width, height } = page.getSize();
+        const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+        const fontSize = 10;
+
+        // Empieza 4 líneas más abajo
+        let startY = height - 130;
+
+        // Agregar folio en rojo y negritas
+        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(1, 0, 0), bold: true });
+        startY -= 20;
+
+        // Agregar cliente en negritas
+        page.drawText(`Cliente:`, { x: 50, y: startY, size: fontSize, font, bold: true });
+        page.drawText(cliente, { x: 120, y: startY, size: fontSize, font });
+        startY -= 20;
+
+        // Agregar fecha en negritas
+        page.drawText(`Fecha:`, { x: 50, y: startY, size: fontSize, font, bold: true });
+        page.drawText(fecha, { x: 120, y: startY, size: fontSize, font });
+        startY -= 40; // Espacio para la leyenda
+
+        // Leyenda de aceptación
+        page.drawText(`Una vez pagada la cotización se da por aceptado de conformidad el producto o servicio.`, { x: 50, y: startY, size: fontSize, font });
+        startY -= 30;
+
+        // Títulos de la tabla (reducción del espacio para la columna de "Cantidad")
+        page.drawText("Descripción", { x: 50, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Cantidad", { x: 320, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Unidad", { x: 380, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Precio", { x: 460, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Subtotal", { x: 540, y: startY, size: fontSize, font, bold: true });
+        startY -= 20;
+
+        // Agregar productos en la tabla con restricciones de espacio
+        for (const p of productos) {
+          if (startY < 100) break; // evita escribir sobre el pie del PDF
+          page.drawText(p.descripcion, { x: 50, y: startY, size: fontSize, font, maxWidth: 260 }); // Descripción más ancha
+          page.drawText(p.cantidad.toString(), { x: 320, y: startY, size: fontSize, font });
+          page.drawText(p.unidad, { x: 380, y: startY, size: fontSize, font });
+          page.drawText(`$${p.precio.toFixed(2)}`, { x: 460, y: startY, size: fontSize, font });
+          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 540, y: startY, size: fontSize, font });
+          startY -= 18;
+        }
+
+        const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
+
+        // Calcular el IVA si corresponde
+        const iva = confirm("¿La cotización incluye IVA?");
+        const totalConIva = iva ? total * 1.16 : total; // 16% IVA
+        page.drawText(`TOTAL: $${totalConIva.toFixed(2)}`, { x: 400, y: startY - 20, size: fontSize + 1, font });
+
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
+
+        folio++;
+        localStorage.setItem("folio", folio);
+      } catch (error) {
+        alert("Error al generar PDF: " + error.message);
+        console.error(error);
+      }
+    }
+  </script>
+</body>
+</html>
