@@ -164,20 +164,20 @@
 
         // Títulos de la tabla
         page.drawText("Descripción", { x: 50, y: startY, size: fontSize, font, bold: true });
-        page.drawText("Cantidad", { x: 200, y: startY, size: fontSize, font, bold: true });
-        page.drawText("Unidad", { x: 300, y: startY, size: fontSize, font, bold: true });
-        page.drawText("Precio", { x: 380, y: startY, size: fontSize, font, bold: true });
-        page.drawText("Subtotal", { x: 460, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Cantidad", { x: 320, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Unidad", { x: 380, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Precio", { x: 460, y: startY, size: fontSize, font, bold: true });
+        page.drawText("Subtotal", { x: 540, y: startY, size: fontSize, font, bold: true });
         startY -= 20;
 
         // Agregar productos en la tabla
         for (const p of productos) {
           if (startY < 100) break; // evita escribir sobre el pie del PDF
-          page.drawText(p.descripcion, { x: 50, y: startY, size: fontSize, font });
-          page.drawText(p.cantidad.toString(), { x: 200, y: startY, size: fontSize, font });
-          page.drawText(p.unidad, { x: 300, y: startY, size: fontSize, font });
-          page.drawText(`$${p.precio.toFixed(2)}`, { x: 380, y: startY, size: fontSize, font });
-          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 460, y: startY, size: fontSize, font });
+          page.drawText(p.descripcion, { x: 50, y: startY, size: fontSize, font, maxWidth: 270 });
+          page.drawText(p.cantidad.toString(), { x: 320, y: startY, size: fontSize, font });
+          page.drawText(p.unidad, { x: 380, y: startY, size: fontSize, font });
+          page.drawText(`$${p.precio.toFixed(2)}`, { x: 460, y: startY, size: fontSize, font });
+          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 540, y: startY, size: fontSize, font });
           startY -= 18;
         }
 
