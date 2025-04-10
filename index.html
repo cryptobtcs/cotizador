@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Cotizador Formal PDF</title>
-  <script src="https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+  <title>Cotizador PDF</title>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script src="https://unpkg.com/file-saver"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -25,9 +26,8 @@
     }
     input, select {
       padding: 10px;
-      margin: 5px 0;
+      margin: 5px;
       width: 100%;
-      box-sizing: border-box;
     }
     table {
       width: 100%;
@@ -35,10 +35,9 @@
       margin-top: 15px;
     }
     th, td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: left;
-      word-break: break-word;
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
     }
     th {
       background: #b00000;
@@ -55,174 +54,267 @@
     .btn:hover {
       background: #900000;
     }
-    @media screen and (max-width: 600px) {
-      .container {
-        padding: 10px;
-      }
-      table, thead, tbody, th, td, tr {
-        font-size: 12px;
-      }
+    .logo {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 3.7cm;
+      height: 4.1cm;
+    }
+    .header-text {
+      text-align: center;
+      margin-top: 50px;
+    }
+    .footer-text {
+      text-align: center;
+      margin-top: 20px;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
-<div class="container">
-  <h1>Generador de Cotizaciones</h1>
-  <input type="text" id="cliente" placeholder="Nombre del Cliente" />
-  <input type="date" id="fecha" />
+  <div class="container">
+    <h1>Generador de Cotizaciones</h1>
+    <input type="text" id="cliente" placeholder="Nombre del Cliente" />
+    <input type="date" id="fecha" />
 
-  <label>
-    <input type="checkbox" id="incluyeIVA"> ¿Incluir IVA (16%)?
-  </label>
+    <h3>Agregar Producto/Servicio</h3>
+    <input type="text" id="descripcion" placeholder="Descripción" />
+    <input type="number" id="cantidad" placeholder="Cantidad" />
+    <input type="text" id="unidad" placeholder="Unidad (ej. pieza, m2, kg)" />
+    <input type="number" id="precio" placeholder="Precio Unitario" />
+    <button class="btn" onclick="agregarProducto()">Agregar</button>
 
-  <h3>Agregar Producto/Servicio</h3>
-  <input type="text" id="descripcion" placeholder="Descripción" />
-  <input type="number" id="cantidad" placeholder="Cantidad" />
-  <input type="text" id="unidad" placeholder="Unidad (ej. pieza, m2, kg)" />
-  <input type="number" id="precio" placeholder="Precio Unitario" />
-  <button class="btn" onclick="agregarProducto()">Agregar</button>
+    <table id="tabla">
+      <thead>
+        <tr>
+          <th>Descripción</th>
+          <th>Cantidad</th>
+          <th>Unidad</th>
+          <th>Precio</th>
+          <th>Subtotal</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
 
-  <table id="tablaHTML">
-    <thead>
-      <tr>
-        <th>Descripción</th>
-        <th>Cantidad</th>
-        <th>Unidad</th>
-        <th>Precio</th>
-        <th>Subtotal</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+    <h3 id="total"></h3>
+    <label for="iva">¿Incluye IVA?</label>
+    <select id="iva">
+      <option value="yes">Sí</option>
+      <option value="no">No</option>
+    </select>
 
-  <h3 id="total"></h3>
-  <button class="btn" onclick="generarPDF()">Descargar PDF</button>
-</div>
+    <button class="btn" onclick="generarPDF()">Descargar PDF</button>
+  </div>
 
-<!-- PDF ZONA -->
-<div id="pdf-area" style="display:none; padding: 20px; font-family: Arial;">
-  <h2 style="color:#b00000;">Cotización</h2>
-  <table>
-    <tr>
-      <td style="font-weight:bold;">Cliente:</td>
-      <td id="pdf-cliente"></td>
-      <td style="font-weight:bold;">Fecha:</td>
-      <td id="pdf-fecha"></td>
-    </tr>
-  </table>
+  <script>
+    let productos = [];
+    let folio = parseInt(localStorage.getItem("folio") || "1");
 
-  <table style="margin-top: 20px;">
-    <thead>
-      <tr style="background-color: #b00000; color: white;">
-        <th>Descripción</th>
-        <th>Cantidad</th>
-        <th>Unidad</th>
-        <th>Precio</th>
-        <th>Subtotal</th>
-      </tr>
-    </thead>
-    <tbody id="pdf-body"></tbody>
-  </table>
+    function agregarProducto() {
+      const descripcion = document.getElementById("descripcion").value;
+      const cantidad = parseFloat(document.getElementById("cantidad").value);
+      const unidad = document.getElementById("unidad").value;
+      const precio = parseFloat(document.getElementById("precio").value);
 
-  <h3 id="pdf-total" style="margin-top: 20px;"></h3>
-</div>
+      if (!descripcion || !cantidad || !unidad || !precio) return alert("Faltan datos");
 
-<script>
-  let productos = [];
+      const subtotal = cantidad * precio;
+      productos.push({ descripcion, cantidad, unidad, precio, subtotal });
 
-  function agregarProducto() {
-    const descripcion = document.getElementById("descripcion").value;
-    const cantidad = parseFloat(document.getElementById("cantidad").value);
-    const unidad = document.getElementById("unidad").value;
-    const precio = parseFloat(document.getElementById("precio").value);
+      const row = `<tr><td>${descripcion}</td><td>${cantidad}</td><td>${unidad}</td><td>$${precio.toFixed(2)}</td><td>$${subtotal.toFixed(2)}</td></tr>`;
+      document.querySelector("#tabla tbody").innerHTML += row;
 
-    if (!descripcion || !cantidad || !unidad || !precio) {
-      alert("Faltan datos");
-      return;
+      actualizarTotal();
+
+      // Limpiar campos
+      document.getElementById("descripcion").value = "";
+      document.getElementById("cantidad").value = "";
+      document.getElementById("unidad").value = "";
+      document.getElementById("precio").value = "";
     }
 
-    const subtotal = cantidad * precio;
-    productos.push({ descripcion, cantidad, unidad, precio, subtotal });
-
-    const row = `<tr>
-      <td>${descripcion}</td>
-      <td>${cantidad}</td>
-      <td>${unidad}</td>
-      <td>$${precio.toFixed(2)}</td>
-      <td>$${subtotal.toFixed(2)}</td>
-    </tr>`;
-
-    document.querySelector("#tablaHTML tbody").innerHTML += row;
-    actualizarTotal();
-
-    document.getElementById("descripcion").value = "";
-    document.getElementById("cantidad").value = "";
-    document.getElementById("unidad").value = "";
-    document.getElementById("precio").value = "";
-  }
-
-  function actualizarTotal() {
-    const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
-    document.getElementById("total").innerText = `Total: $${total.toFixed(2)}`;
-  }
-
-  function generarPDF() {
-    if (productos.length === 0) {
-      alert("Agrega al menos un producto o servicio");
-      return;
+    function actualizarTotal() {
+      const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
+      document.getElementById("total").innerText = `Total: $${total.toFixed(2)}`;
     }
 
-    const cliente = document.getElementById("cliente").value;
-    const fecha = document.getElementById("fecha").value;
-    const incluirIVA = document.getElementById("incluyeIVA").checked;
+    async function generarPDF() {
+      const cliente = document.getElementById("cliente").value;
+      const fecha = document.getElementById("fecha").value;
+      const ivaSeleccionado = document.getElementById("iva").value;
 
-    if (!cliente || !fecha) {
-      alert("Faltan datos del cliente o fecha");
-      return;
+      if (!cliente || !fecha || productos.length === 0) {
+        alert("Faltan datos");
+        return;
+      }
+
+      const ivaPorcentaje = ivaSeleccionado === "yes" ? 0.16 : 0;
+      const totalSinIva = productos.reduce((sum, p) => sum + p.subtotal, 0);
+      const ivaMonto = totalSinIva * ivaPorcentaje;
+      const totalConIva = totalSinIva + ivaMonto;
+
+      try {
+        const pdfDoc = await PDFLib.PDFDocument.create();
+        const page = pdfDoc.addPage([595, 842]); // Tamaño A4 en puntos
+        const { width, height } = page.getSize();
+        const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+        const fontSize = 10;
+
+        // Agregar logo
+        const logoBytes = await fetch('logo1.jpg').then(res => res.arrayBuffer());
+        const logoImage = await pdfDoc.embedJpg(logoBytes);
+        page.drawImage(logoImage, {
+          x: width - 150,
+          y: height - 100,
+          width: 3.7 * 28.35, // Convertir cm a puntos (1 cm = 28.35 puntos)
+          height: 4.1 * 28.35
+        });
+
+        // Membrete superior
+        page.drawText('Cotización', { x: width / 2 - 50, y: height - 50, size: fontSize + 2, font, color: PDFLib.rgb(0, 0, 0) });
+
+        let startY = height - 150;
+
+        // Datos del cliente y fecha
+        page.drawText('Cliente:', { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0) });
+        page.drawText(cliente, { x: 100, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0) });
+        startY -= 20;
+
+        page.drawText('Fecha:', { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0) });
+        page.drawText(fecha, { x: 100, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0) });
+        startY -= 30;
+
+        // Tabla
+        const tableHeaders = ["Descripción", "Cantidad", "Unidad", "Precio", "Subtotal"];
+        const headerX = [50, 200, 300, 380, 460];
+        const headerWidth = [150, 50, 50, 80, 80];
+        let rowY = startY;
+        const headerHeight = 15;
+
+        tableHeaders.forEach((header, i) => {
+          page.drawRectangle({
+            x: headerX[i],
+            y: rowY - headerHeight + 3,
+            width: headerWidth[i],
+            height: headerHeight,
+            color: PDFLib.rgb(0.7, 0, 0),
+          });
+
+          page.drawText(header, {
+            x: headerX[i] + 2,
+            y: rowY,
+            size: fontSize,
+            font,
+            color: PDFLib.rgb(1, 1, 1)
+          });
+        });
+
+        rowY -= headerHeight + 3;
+
+        // Datos de productos
+        for (const p of productos) {
+          if (rowY < 100) break;
+
+          const descLines = splitTextIntoLines(p.descripcion, 50);
+          const lineHeight = 12;
+          const itemHeight = lineHeight * descLines.length;
+
+          descLines.forEach((line, index) => {
+            page.drawText(line, {
+              x: headerX[0],
+              y: rowY - (lineHeight * index),
+              size: fontSize,
+              font
+            });
+          });
+
+          page.drawText(p.cantidad.toString(), { x: headerX[1], y: rowY, size: fontSize, font });
+          page.drawText(p.unidad, { x: headerX[2], y: rowY, size: fontSize, font });
+          page.drawText(`$${p.precio.toFixed(2)}`, { x: headerX[3], y: rowY, size: fontSize, font });
+          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: headerX[4], y: rowY, size: fontSize, font });
+
+          rowY -= itemHeight + 5;
+        }
+
+        // Total
+        page.drawText(`TOTAL: $${totalConIva.toFixed(2)}`, {
+          x: width - 180,
+          y: rowY - 20,
+          size: fontSize + 1,
+          font
+        });
+
+        // IVA
+        page.drawText(`IVA (${ivaPorcentaje * 100}%): $${ivaMonto.toFixed(2)}`, {
+          x: width - 180,
+          y: rowY - 40,
+          size: fontSize,
+          font
+        });
+
+        // Leyenda de IVA
+        const ivaLeyenda = ivaSeleccionado === 'yes' ? 'Incluye IVA' : 'No incluye IVA';
+        page.drawText(ivaLeyenda, {
+          x: width - 180,
+          y: rowY - 60,
+          size: fontSize,
+          font
+        });
+
+        // Atención y ciudad
+        page.drawText('Atención: Lic Eduardo Hércules Rodríguez', {
+          x: width / 2 - 100,
+          y: rowY - 80,
+          size: fontSize,
+          font
+        });
+        page.drawText('Ciudad Valles, S.L.P.', {
+          x: width / 2 - 100,
+          y: rowY - 100,
+          size: fontSize,
+          font
+        });
+
+        // Membrete inferior
+        page.drawText('Firma y sello', {
+          x: width / 2 - 50,
+          y: rowY - 120,
+          size: fontSize + 2,
+          font,
+          color: PDFLib.rgb(0, 0, 0)
+        });
+
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
+
+        folio++;
+        localStorage.setItem("folio", folio);
+      } catch (error) {
+        alert("Error al generar PDF: " + error.message);
+        console.error(error);
+      }
     }
 
-    document.getElementById("pdf-cliente").innerText = cliente;
-    document.getElementById("pdf-fecha").innerText = fecha;
+    function splitTextIntoLines(text, maxCharsPerLine) {
+      const words = text.split(' ');
+      const lines = [];
+      let currentLine = '';
 
-    const cuerpoTabla = document.getElementById("pdf-body");
-    cuerpoTabla.innerHTML = "";
-    let total = 0;
+      words.forEach(word => {
+        if ((currentLine + word).length > maxCharsPerLine) {
+          lines.push(currentLine);
+          currentLine = word + ' ';
+        } else {
+          currentLine += word + ' ';
+        }
+      });
 
-    productos.forEach(p => {
-      const fila = document.createElement("tr");
-      fila.innerHTML = `
-        <td>${p.descripcion}</td>
-        <td>${p.cantidad}</td>
-        <td>${p.unidad}</td>
-        <td>$${p.precio.toFixed(2)}</td>
-        <td>$${p.subtotal.toFixed(2)}</td>
-      `;
-      cuerpoTabla.appendChild(fila);
-      total += p.subtotal;
-    });
-
-    if (incluirIVA) {
-      const iva = total * 0.16;
-      total += iva;
+      if (currentLine) lines.push(currentLine.trim());
+      return lines;
     }
-
-    document.getElementById("pdf-total").innerText = `TOTAL: $${total.toFixed(2)}`;
-
-    const pdfArea = document.getElementById("pdf-area");
-    pdfArea.style.display = "block";
-
-    const opt = {
-      margin: 0.5,
-      filename: `cotizacion_${cliente}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    html2pdf().from(pdfArea).set(opt).save().then(() => {
-      pdfArea.style.display = "none";
-    });
-  }
-</script>
+  </script>
 </body>
 </html>
