@@ -66,35 +66,40 @@
     }
 
     @media (max-width: 600px) {
-      table, thead, tbody, th, td, tr {
-        display: block;
+      input, select, button {
+        width: 100%;
       }
+    }
 
-      th, td {
-        text-align: right;
-        padding-left: 50%;
-        position: relative;
-      }
+    /* Ocultamos el div del PDF en pantalla */
+    #plantillaPDF {
+      display: none;
+    }
 
-      th::before, td::before {
-        position: absolute;
-        left: 10px;
-        width: 45%;
-        white-space: nowrap;
-        text-align: left;
-        font-weight: bold;
-      }
+    .pdf-header {
+      margin-bottom: 20px;
+    }
 
-      th:nth-child(1)::before { content: "Descripción"; }
-      th:nth-child(2)::before { content: "Cantidad"; }
-      th:nth-child(3)::before { content: "Unidad"; }
-      th:nth-child(4)::before { content: "Precio"; }
-      th:nth-child(5)::before { content: "Subtotal"; }
+    .pdf-header td {
+      font-weight: bold;
+      padding: 5px;
+    }
+
+    .pdf-total {
+      margin-top: 15px;
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .pdf-nota {
+      margin-top: 10px;
+      font-size: 0.9em;
+      color: #555;
     }
   </style>
 </head>
 <body>
-  <div class="container" id="cotizacion">
+  <div class="container">
     <h1>Generador de Cotizaciones</h1>
     <input type="text" id="cliente" placeholder="Nombre del Cliente" />
     <input type="date" id="fecha" />
@@ -122,7 +127,34 @@
 
     <h3 id="total"></h3>
     <p>Una vez pagada la cotización, se da por aceptado el producto o servicio.</p>
-    <button class="btn" onclick="generarPDF()">Descargar PDF</button>
+    <button class="btn" onclick="generarPDF()">Descargar Cotización Formal</button>
+  </div>
+
+  <!-- PLANTILLA QUE SE EXPORTA AL PDF -->
+  <div id="plantillaPDF">
+    <h2 style="text-align: center;">Cotización</h2>
+    <table class="pdf-header">
+      <tr>
+        <td>Cliente:</td>
+        <td id="pdfCliente"></td>
+        <td>Fecha:</td>
+        <td id="pdfFecha"></td>
+      </tr>
+    </table>
+    <table>
+      <thead>
+        <tr>
+          <th>Descripción</th>
+          <th>Cantidad</th>
+          <th>Unidad</th>
+          <th>Precio</th>
+          <th>Subtotal</th>
+        </tr>
+      </thead>
+      <tbody id="pdfTabla"></tbody>
+    </table>
+    <div class="pdf-total" id="pdfTotal"></div>
+    <div class="pdf-nota">Una vez pagada la cotización, se da por aceptado el producto o servicio.</div>
   </div>
 
   <script>
@@ -172,19 +204,46 @@
     function generarPDF() {
       const cliente = document.getElementById("cliente").value;
       const fecha = document.getElementById("fecha").value;
+      const conIVA = document.getElementById("conIVA").checked;
 
       if (!cliente || !fecha || productos.length === 0) {
         alert("Faltan datos para generar la cotización.");
         return;
       }
 
-      const element = document.getElementById("cotizacion");
+      // Llenar plantilla PDF
+      document.getElementById("pdfCliente").innerText = cliente;
+      document.getElementById("pdfFecha").innerText = fecha;
+
+      const cuerpo = document.getElementById("pdfTabla");
+      cuerpo.innerHTML = "";
+
+      let subtotal = 0;
+
+      productos.forEach(p => {
+        subtotal += p.subtotal;
+        cuerpo.innerHTML += `
+          <tr>
+            <td>${p.descripcion}</td>
+            <td>${p.cantidad}</td>
+            <td>${p.unidad}</td>
+            <td>$${p.precio.toFixed(2)}</td>
+            <td>$${p.subtotal.toFixed(2)}</td>
+          </tr>`;
+      });
+
+      const iva = conIVA ? subtotal * 0.16 : 0;
+      const total = subtotal + iva;
+
+      document.getElementById("pdfTotal").innerText = `Total: $${total.toFixed(2)} ${conIVA ? '(Incluye IVA)' : ''}`;
+
+      const element = document.getElementById("plantillaPDF");
       const opt = {
-        margin:       0.5,
-        filename:     `cotizacion_${cliente.replace(/\s+/g, '_')}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2 },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        margin: 0.5,
+        filename: `cotizacion_${cliente.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
       };
 
       html2pdf().set(opt).from(element).save();
