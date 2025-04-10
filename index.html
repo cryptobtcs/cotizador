@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Cotizador PDF</title>
-  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
-  <script src="https://unpkg.com/file-saver"></script>
+  <title>Generador de Cotizaciones</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -13,6 +12,7 @@
       padding: 20px;
       color: #111;
     }
+
     .container {
       background: white;
       border-radius: 8px;
@@ -21,26 +21,36 @@
       margin: auto;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
+
     input, select {
       padding: 10px;
       margin: 5px 0;
       width: 100%;
       box-sizing: border-box;
     }
+
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 15px;
     }
+
     th, td {
       border: 1px solid #ddd;
       padding: 8px;
-      text-align: center;
+      text-align: left;
+      word-break: break-word;
     }
+
     th {
       background: #b00000;
       color: white;
     }
+
+    h1, h3 {
+      color: #b00000;
+    }
+
     .btn {
       background: #b00000;
       color: white;
@@ -50,27 +60,47 @@
       cursor: pointer;
       width: 100%;
     }
+
     .btn:hover {
       background: #900000;
     }
+
     @media (max-width: 600px) {
-      .container {
-        padding: 10px;
+      table, thead, tbody, th, td, tr {
+        display: block;
       }
-      input, select, .btn {
-        font-size: 16px;
+
+      th, td {
+        text-align: right;
+        padding-left: 50%;
+        position: relative;
       }
+
+      th::before, td::before {
+        position: absolute;
+        left: 10px;
+        width: 45%;
+        white-space: nowrap;
+        text-align: left;
+        font-weight: bold;
+      }
+
+      th:nth-child(1)::before { content: "Descripción"; }
+      th:nth-child(2)::before { content: "Cantidad"; }
+      th:nth-child(3)::before { content: "Unidad"; }
+      th:nth-child(4)::before { content: "Precio"; }
+      th:nth-child(5)::before { content: "Subtotal"; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="container" id="cotizacion">
     <h1>Generador de Cotizaciones</h1>
     <input type="text" id="cliente" placeholder="Nombre del Cliente" />
     <input type="date" id="fecha" />
-    <label><input type="checkbox" id="iva" /> ¿Incluir IVA?</label>
+    <label><input type="checkbox" id="conIVA" /> Incluir IVA (16%)</label>
 
-    <h3>Agregar Producto/Servicio</h3>
+    <h3>Agregar Producto o Servicio</h3>
     <input type="text" id="descripcion" placeholder="Descripción" />
     <input type="number" id="cantidad" placeholder="Cantidad" />
     <input type="text" id="unidad" placeholder="Unidad (ej. pieza, m2, kg)" />
@@ -91,12 +121,12 @@
     </table>
 
     <h3 id="total"></h3>
+    <p>Una vez pagada la cotización, se da por aceptado el producto o servicio.</p>
     <button class="btn" onclick="generarPDF()">Descargar PDF</button>
   </div>
 
   <script>
     let productos = [];
-    let folio = parseInt(localStorage.getItem("folio") || "1");
 
     function agregarProducto() {
       const descripcion = document.getElementById("descripcion").value;
@@ -104,135 +134,60 @@
       const unidad = document.getElementById("unidad").value;
       const precio = parseFloat(document.getElementById("precio").value);
 
-      if (!descripcion || !cantidad || !unidad || !precio) return alert("Faltan datos");
+      if (!descripcion || !cantidad || !unidad || !precio) {
+        alert("Faltan datos");
+        return;
+      }
 
       const subtotal = cantidad * precio;
       productos.push({ descripcion, cantidad, unidad, precio, subtotal });
 
-      const row = `<tr><td>${descripcion}</td><td>${cantidad}</td><td>${unidad}</td><td>$${precio.toFixed(2)}</td><td>$${subtotal.toFixed(2)}</td></tr>`;
-      document.querySelector("#tabla tbody").innerHTML += row;
-
-      actualizarTotal();
+      const fila = `
+        <tr>
+          <td>${descripcion}</td>
+          <td>${cantidad}</td>
+          <td>${unidad}</td>
+          <td>$${precio.toFixed(2)}</td>
+          <td>$${subtotal.toFixed(2)}</td>
+        </tr>`;
+      document.querySelector("#tabla tbody").innerHTML += fila;
 
       document.getElementById("descripcion").value = "";
       document.getElementById("cantidad").value = "";
       document.getElementById("unidad").value = "";
       document.getElementById("precio").value = "";
+
+      actualizarTotal();
     }
 
     function actualizarTotal() {
-      let total = productos.reduce((sum, p) => sum + p.subtotal, 0);
-      const incluyeIVA = document.getElementById("iva").checked;
-      if (incluyeIVA) total *= 1.16;
-      document.getElementById("total").innerText = `Total: $${total.toFixed(2)}`;
+      const conIVA = document.getElementById("conIVA").checked;
+      const subtotal = productos.reduce((acc, p) => acc + p.subtotal, 0);
+      const iva = conIVA ? subtotal * 0.16 : 0;
+      const total = subtotal + iva;
+
+      document.getElementById("total").innerText = `Total: $${total.toFixed(2)} ${conIVA ? '(Incluye IVA)' : ''}`;
     }
 
-    function splitTextIntoLines(text, maxChars) {
-      const words = text.split(" ");
-      const lines = [];
-      let line = "";
-      for (let word of words) {
-        if ((line + word).length > maxChars) {
-          lines.push(line.trim());
-          line = word + " ";
-        } else {
-          line += word + " ";
-        }
-      }
-      if (line) lines.push(line.trim());
-      return lines;
-    }
-
-    async function generarPDF() {
+    function generarPDF() {
       const cliente = document.getElementById("cliente").value;
       const fecha = document.getElementById("fecha").value;
-      const incluyeIVA = document.getElementById("iva").checked;
 
       if (!cliente || !fecha || productos.length === 0) {
-        alert("Faltan datos");
+        alert("Faltan datos para generar la cotización.");
         return;
       }
 
-      const pdfDoc = await PDFLib.PDFDocument.create();
-      const page = pdfDoc.addPage([595, 842]);
-      const { width, height } = page.getSize();
-      const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-      const fontSize = 10;
-      let y = height - 50;
+      const element = document.getElementById("cotizacion");
+      const opt = {
+        margin:       0.5,
+        filename:     `cotizacion_${cliente.replace(/\s+/g, '_')}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2 },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
 
-      // Encabezado Cliente y Fecha en tabla
-      page.drawRectangle({ x: 50, y: y, width: 495, height: 40, color: PDFLib.rgb(0.95, 0.95, 0.95) });
-      page.drawText("Cliente:", { x: 60, y: y + 25, size: fontSize + 1, font, color: PDFLib.rgb(0, 0, 0) });
-      page.drawText(cliente, { x: 120, y: y + 25, size: fontSize, font });
-
-      page.drawText("Fecha:", { x: 60, y: y + 10, size: fontSize + 1, font });
-      page.drawText(fecha, { x: 120, y: y + 10, size: fontSize, font });
-
-      y -= 60;
-
-      // Encabezados de tabla
-      const headers = ["Descripción", "Cantidad", "Unidad", "Precio", "Subtotal"];
-      const cols = [50, 250, 320, 390, 470];
-      const colWidths = [200, 70, 70, 80, 75];
-
-      for (let i = 0; i < headers.length; i++) {
-        page.drawRectangle({
-          x: cols[i],
-          y: y,
-          width: colWidths[i],
-          height: 20,
-          color: PDFLib.rgb(0.7, 0, 0),
-        });
-        page.drawText(headers[i], {
-          x: cols[i] + 5,
-          y: y + 5,
-          size: fontSize,
-          font,
-          color: PDFLib.rgb(1, 1, 1),
-        });
-      }
-
-      y -= 25;
-
-      // Productos
-      for (let p of productos) {
-        const descLines = splitTextIntoLines(p.descripcion, 38);
-        const rowHeight = descLines.length * 12;
-
-        if (y - rowHeight < 80) {
-          page = pdfDoc.addPage([595, 842]);
-          y = height - 50;
-        }
-
-        descLines.forEach((line, i) => {
-          page.drawText(line, { x: cols[0] + 2, y: y - 12 * i, size: fontSize, font });
-        });
-
-        page.drawText(p.cantidad.toString(), { x: cols[1] + 5, y: y, size: fontSize, font });
-        page.drawText(p.unidad, { x: cols[2] + 5, y: y, size: fontSize, font });
-        page.drawText(`$${p.precio.toFixed(2)}`, { x: cols[3] + 5, y: y, size: fontSize, font });
-        page.drawText(`$${p.subtotal.toFixed(2)}`, { x: cols[4] + 5, y: y, size: fontSize, font });
-
-        y -= rowHeight + 10;
-      }
-
-      // Total
-      let total = productos.reduce((sum, p) => sum + p.subtotal, 0);
-      if (incluyeIVA) total *= 1.16;
-
-      page.drawText(`TOTAL: $${total.toFixed(2)}`, {
-        x: 400,
-        y: y - 20,
-        size: fontSize + 1,
-        font,
-        color: PDFLib.rgb(0, 0, 0)
-      });
-
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
-      saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
-      folio++;
-      localStorage.setItem("folio", folio);
+      html2pdf().set(opt).from(element).save();
     }
   </script>
 </body>
