@@ -118,6 +118,24 @@
       document.getElementById("total").innerText = `Total: $${total.toFixed(2)}`;
     }
 
+    function splitTextIntoLines(text, maxCharsPerLine) {
+      const words = text.split(' ');
+      const lines = [];
+      let currentLine = '';
+
+      words.forEach(word => {
+        if ((currentLine + word).length > maxCharsPerLine) {
+          lines.push(currentLine);
+          currentLine = word + ' ';
+        } else {
+          currentLine += word + ' ';
+        }
+      });
+
+      if (currentLine) lines.push(currentLine.trim());
+      return lines;
+    }
+
     async function generarPDF() {
       const cliente = document.getElementById("cliente").value;
       const fecha = document.getElementById("fecha").value;
@@ -127,71 +145,96 @@
         return;
       }
 
-      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté en la misma carpeta que tu HTML
+      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté en la misma carpeta
 
       try {
-        const existingPdfBytes = await fetch(url).then(res => {
-          if (!res.ok) throw new Error("No se pudo cargar la plantilla PDF");
-          return res.arrayBuffer();
-        });
-
+        const existingPdfBytes = await fetch(url).then(res => res.arrayBuffer());
         const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
         const page = pdfDoc.getPages()[0];
         const { width, height } = page.getSize();
         const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
         const fontSize = 10;
 
-        // Empieza 4 líneas abajo de lo que ya había
         let startY = height - 130;
-
-        // Folio en negrita y color rojo
-        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(1, 0, 0), maxWidth: 400, lineHeight: 12 });
+        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, {
+          x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(1, 0, 0)
+        });
         startY -= 20;
 
-        // Cliente en negrita
-        page.drawText(`Cliente:`, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0), maxWidth: 400, lineHeight: 12 });
+        page.drawText(`Cliente:`, { x: 50, y: startY, size: fontSize, font });
         startY -= 15;
-        page.drawText(cliente, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0), maxWidth: 400, lineHeight: 12 });
+        page.drawText(cliente, { x: 50, y: startY, size: fontSize, font });
         startY -= 20;
 
-        // Fecha en negrita
-        page.drawText(`Fecha:`, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0), maxWidth: 400, lineHeight: 12 });
+        page.drawText(`Fecha:`, { x: 50, y: startY, size: fontSize, font });
         startY -= 15;
-        page.drawText(fecha, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0), maxWidth: 400, lineHeight: 12 });
+        page.drawText(fecha, { x: 50, y: startY, size: fontSize, font });
         startY -= 30;
 
-        // Leyenda de aceptación
-        page.drawText("Una vez pagada la cotización, se da por aceptado el producto o servicio.", { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0), maxWidth: 400, lineHeight: 12 });
+        page.drawText("Una vez pagada la cotización, se da por aceptado el producto o servicio.", {
+          x: 50, y: startY, size: fontSize, font
+        });
         startY -= 30;
 
-        // Dibujar la tabla
-        const tableTop = startY;
+        // Tabla
         const tableHeaders = ["Descripción", "Cantidad", "Unidad", "Precio", "Subtotal"];
         const headerX = [50, 200, 300, 380, 460];
         const headerWidth = [150, 50, 50, 80, 80];
-        let rowY = tableTop;
+        let rowY = startY;
+        const headerHeight = 15;
 
-        // Dibujar encabezados
+        // Fondo rojo y encabezados blancos
         tableHeaders.forEach((header, i) => {
-          page.drawText(header, { x: headerX[i], y: rowY, size: fontSize, font, color: PDFLib.rgb(1, 1, 1), backgroundColor: PDFLib.rgb(0.7, 0, 0), maxWidth: headerWidth[i] });
+          page.drawRectangle({
+            x: headerX[i],
+            y: rowY - headerHeight + 3,
+            width: headerWidth[i],
+            height: headerHeight,
+            color: PDFLib.rgb(0.7, 0, 0),
+          });
+
+          page.drawText(header, {
+            x: headerX[i] + 2,
+            y: rowY,
+            size: fontSize,
+            font,
+            color: PDFLib.rgb(1, 1, 1)
+          });
         });
-        rowY -= 15;  // Después de los encabezados
 
-        // Dibujar las filas
+        rowY -= headerHeight + 3;
+
         for (const p of productos) {
-          if (rowY < 100) break; // Evitar que sobrepasen el pie del PDF
+          if (rowY < 100) break;
 
-          page.drawText(p.descripcion.substring(0, 50), { x: headerX[0], y: rowY, size: fontSize, font, maxWidth: headerWidth[0] });
+          const descLines = splitTextIntoLines(p.descripcion, 50);
+          const lineHeight = 12;
+          const itemHeight = lineHeight * descLines.length;
+
+          descLines.forEach((line, index) => {
+            page.drawText(line, {
+              x: headerX[0],
+              y: rowY - (lineHeight * index),
+              size: fontSize,
+              font
+            });
+          });
+
           page.drawText(p.cantidad.toString(), { x: headerX[1], y: rowY, size: fontSize, font });
           page.drawText(p.unidad, { x: headerX[2], y: rowY, size: fontSize, font });
           page.drawText(`$${p.precio.toFixed(2)}`, { x: headerX[3], y: rowY, size: fontSize, font });
           page.drawText(`$${p.subtotal.toFixed(2)}`, { x: headerX[4], y: rowY, size: fontSize, font });
-          rowY -= 18;  // Separación entre filas
+
+          rowY -= itemHeight + 5;
         }
 
-        // Calcular y mostrar el total
         const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
-        page.drawText(`TOTAL: $${total.toFixed(2)}`, { x: 400, y: rowY - 20, size: fontSize + 1, font });
+        page.drawText(`TOTAL: $${total.toFixed(2)}`, {
+          x: 400,
+          y: rowY - 20,
+          size: fontSize + 1,
+          font
+        });
 
         const pdfBytes = await pdfDoc.save();
         const blob = new Blob([pdfBytes], { type: "application/pdf" });
