@@ -11,10 +11,6 @@
       font-family: Arial, sans-serif;
       background: #f4f4f4;
       padding: 20px;
-      color: #111;
-    }
-    h1 {
-      color: #b00000;
     }
     .container {
       background: white;
@@ -24,10 +20,13 @@
       margin: auto;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
-    input, select {
-      padding: 10px;
-      margin: 5px;
+    h1 {
+      color: #b00000;
+    }
+    input, button {
       width: 100%;
+      padding: 10px;
+      margin: 5px 0;
     }
     table {
       width: 100%;
@@ -35,7 +34,7 @@
       margin-top: 15px;
     }
     th, td {
-      border: 1px solid #ddd;
+      border: 1px solid #ccc;
       padding: 8px;
       text-align: center;
     }
@@ -46,8 +45,6 @@
     .btn {
       background: #b00000;
       color: white;
-      padding: 10px 20px;
-      margin-top: 10px;
       border: none;
       cursor: pointer;
     }
@@ -82,7 +79,7 @@
       <tbody></tbody>
     </table>
 
-    <h3 id="total"></h3>
+    <h3 id="total">Total: $0.00</h3>
     <button class="btn" onclick="generarPDF()">Descargar PDF</button>
   </div>
 
@@ -96,12 +93,21 @@
       const unidad = document.getElementById("unidad").value;
       const precio = parseFloat(document.getElementById("precio").value);
 
-      if (!descripcion || !cantidad || !unidad || !precio) return alert("Faltan datos");
+      if (!descripcion || !cantidad || !unidad || !precio) {
+        alert("Completa todos los campos del producto.");
+        return;
+      }
 
       const subtotal = cantidad * precio;
       productos.push({ descripcion, cantidad, unidad, precio, subtotal });
 
-      const row = `<tr><td>${descripcion}</td><td>${cantidad}</td><td>${unidad}</td><td>$${precio.toFixed(2)}</td><td>$${subtotal.toFixed(2)}</td></tr>`;
+      const row = `<tr>
+        <td>${descripcion}</td>
+        <td>${cantidad}</td>
+        <td>${unidad}</td>
+        <td>$${precio.toFixed(2)}</td>
+        <td>$${subtotal.toFixed(2)}</td>
+      </tr>`;
       document.querySelector("#tabla tbody").innerHTML += row;
 
       actualizarTotal();
@@ -118,134 +124,70 @@
       document.getElementById("total").innerText = `Total: $${total.toFixed(2)}`;
     }
 
-    function splitTextIntoLines(text, maxCharsPerLine) {
-      const words = text.split(' ');
-      const lines = [];
-      let currentLine = '';
-
-      words.forEach(word => {
-        if ((currentLine + word).length > maxCharsPerLine) {
-          lines.push(currentLine);
-          currentLine = word + ' ';
-        } else {
-          currentLine += word + ' ';
-        }
-      });
-
-      if (currentLine) lines.push(currentLine.trim());
-      return lines;
-    }
-
     async function generarPDF() {
       const cliente = document.getElementById("cliente").value;
       const fecha = document.getElementById("fecha").value;
 
       if (!cliente || !fecha || productos.length === 0) {
-        alert("Faltan datos");
+        alert("Completa los datos del cliente y al menos un producto.");
         return;
       }
 
-      const url = "plantilla.pdf"; // Asegúrate de que este archivo esté en la misma carpeta
+      const pdfDoc = await PDFLib.PDFDocument.create();
+      const page = pdfDoc.addPage([595, 842]); // Tamaño A4
+      const { width, height } = page.getSize();
+      const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
 
-      try {
-        const existingPdfBytes = await fetch(url).then(res => res.arrayBuffer());
-        const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
-        const page = pdfDoc.getPages()[0];
-        const { width, height } = page.getSize();
-        const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-        const fontSize = 10;
+      let y = height - 50;
+      const fontSize = 12;
 
-        let startY = height - 130;
-        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, {
-          x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(1, 0, 0)
-        });
-        startY -= 20;
+      page.drawText(`Cotización - Folio: ${folio.toString().padStart(4, '0')}`, { x: 50, y, size: 16, font });
+      y -= 30;
+      page.drawText(`Cliente: ${cliente}`, { x: 50, y, size: fontSize, font });
+      y -= 20;
+      page.drawText(`Fecha: ${fecha}`, { x: 50, y, size: fontSize, font });
+      y -= 30;
 
-        page.drawText(`Cliente:`, { x: 50, y: startY, size: fontSize, font });
-        startY -= 15;
-        page.drawText(cliente, { x: 50, y: startY, size: fontSize, font });
-        startY -= 20;
+      page.drawText("Detalle de productos:", { x: 50, y, size: fontSize, font });
+      y -= 20;
 
-        page.drawText(`Fecha:`, { x: 50, y: startY, size: fontSize, font });
-        startY -= 15;
-        page.drawText(fecha, { x: 50, y: startY, size: fontSize, font });
-        startY -= 30;
+      // Encabezados
+      const headers = ["Descripción", "Cantidad", "Unidad", "Precio", "Subtotal"];
+      const colX = [50, 240, 300, 360, 440];
 
-        page.drawText("Una vez pagada la cotización, se da por aceptado el producto o servicio.", {
-          x: 50, y: startY, size: fontSize, font
-        });
-        startY -= 30;
+      headers.forEach((header, i) => {
+        page.drawText(header, { x: colX[i], y, size: fontSize, font });
+      });
 
-        // Tabla
-        const tableHeaders = ["Descripción", "Cantidad", "Unidad", "Precio", "Subtotal"];
-        const headerX = [50, 200, 300, 380, 460];
-        const headerWidth = [150, 50, 50, 80, 80];
-        let rowY = startY;
-        const headerHeight = 15;
+      y -= 15;
 
-        // Fondo rojo y encabezados blancos
-        tableHeaders.forEach((header, i) => {
-          page.drawRectangle({
-            x: headerX[i],
-            y: rowY - headerHeight + 3,
-            width: headerWidth[i],
-            height: headerHeight,
-            color: PDFLib.rgb(0.7, 0, 0),
-          });
-
-          page.drawText(header, {
-            x: headerX[i] + 2,
-            y: rowY,
-            size: fontSize,
-            font,
-            color: PDFLib.rgb(1, 1, 1)
-          });
-        });
-
-        rowY -= headerHeight + 3;
-
-        for (const p of productos) {
-          if (rowY < 100) break;
-
-          const descLines = splitTextIntoLines(p.descripcion, 50);
-          const lineHeight = 12;
-          const itemHeight = lineHeight * descLines.length;
-
-          descLines.forEach((line, index) => {
-            page.drawText(line, {
-              x: headerX[0],
-              y: rowY - (lineHeight * index),
-              size: fontSize,
-              font
-            });
-          });
-
-          page.drawText(p.cantidad.toString(), { x: headerX[1], y: rowY, size: fontSize, font });
-          page.drawText(p.unidad, { x: headerX[2], y: rowY, size: fontSize, font });
-          page.drawText(`$${p.precio.toFixed(2)}`, { x: headerX[3], y: rowY, size: fontSize, font });
-          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: headerX[4], y: rowY, size: fontSize, font });
-
-          rowY -= itemHeight + 5;
-        }
-
-        const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
-        page.drawText(`TOTAL: $${total.toFixed(2)}`, {
-          x: 400,
-          y: rowY - 20,
-          size: fontSize + 1,
-          font
-        });
-
-        const pdfBytes = await pdfDoc.save();
-        const blob = new Blob([pdfBytes], { type: "application/pdf" });
-        saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
-
-        folio++;
-        localStorage.setItem("folio", folio);
-      } catch (error) {
-        alert("Error al generar PDF: " + error.message);
-        console.error(error);
+      // Dibujar productos
+      for (let p of productos) {
+        if (y < 100) break; // evitar salir de la hoja
+        page.drawText(p.descripcion, { x: colX[0], y, size: fontSize - 1, font });
+        page.drawText(p.cantidad.toString(), { x: colX[1], y, size: fontSize - 1, font });
+        page.drawText(p.unidad, { x: colX[2], y, size: fontSize - 1, font });
+        page.drawText(`$${p.precio.toFixed(2)}`, { x: colX[3], y, size: fontSize - 1, font });
+        page.drawText(`$${p.subtotal.toFixed(2)}`, { x: colX[4], y, size: fontSize - 1, font });
+        y -= 15;
       }
+
+      const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
+      y -= 30;
+      page.drawText(`TOTAL: $${total.toFixed(2)}`, { x: 400, y, size: fontSize + 1, font });
+
+      // Leyenda
+      y -= 30;
+      page.drawText("Una vez pagada la cotización, se da por aceptado el producto o servicio.", {
+        x: 50, y, size: fontSize - 1, font
+      });
+
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      saveAs(blob, `cotizacion_${folio.toString().padStart(4, '0')}.pdf`);
+
+      folio++;
+      localStorage.setItem("folio", folio);
     }
   </script>
 </body>
