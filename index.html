@@ -141,68 +141,57 @@
         const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
         const fontSize = 10;
 
-        // Empieza 4 líneas más abajo
+        // Empieza 4 líneas abajo de lo que ya había
         let startY = height - 130;
 
-        // Agregar folio en rojo y negritas
-        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(1, 0, 0), bold: true });
+        // Folio en negrita y color rojo
+        page.drawText(`Folio: ${folio.toString().padStart(4, '0')}`, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(1, 0, 0), maxWidth: 400, lineHeight: 12 });
         startY -= 20;
 
-        // Agregar cliente en negritas
-        page.drawText(`Cliente:`, { x: 50, y: startY, size: fontSize, font, bold: true });
-        page.drawText(cliente, { x: 120, y: startY, size: fontSize, font });
+        // Cliente en negrita
+        page.drawText(`Cliente:`, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0), maxWidth: 400, lineHeight: 12 });
+        startY -= 15;
+        page.drawText(cliente, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0), maxWidth: 400, lineHeight: 12 });
         startY -= 20;
 
-        // Agregar fecha en negritas
-        page.drawText(`Fecha:`, { x: 50, y: startY, size: fontSize, font, bold: true });
-        page.drawText(fecha, { x: 120, y: startY, size: fontSize, font });
-        startY -= 40; // Espacio para la leyenda
-
-        // Leyenda de aceptación
-        page.drawText(`Una vez pagada la cotización se da por aceptado de conformidad el producto o servicio.`, { x: 50, y: startY, size: fontSize, font });
+        // Fecha en negrita
+        page.drawText(`Fecha:`, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0), maxWidth: 400, lineHeight: 12 });
+        startY -= 15;
+        page.drawText(fecha, { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0), maxWidth: 400, lineHeight: 12 });
         startY -= 30;
 
-        // Títulos de la tabla (reducción del espacio para la columna de "Cantidad")
-        page.drawText("Descripción", { x: 50, y: startY, size: fontSize, font, bold: true });
-        page.drawText("Cantidad", { x: 320, y: startY, size: fontSize, font, bold: true });
-        page.drawText("Unidad", { x: 380, y: startY, size: fontSize, font, bold: true });
-        page.drawText("Precio", { x: 460, y: startY, size: fontSize, font, bold: true });
-        page.drawText("Subtotal", { x: 540, y: startY, size: fontSize, font, bold: true });
-        startY -= 20;
+        // Leyenda de aceptación
+        page.drawText("Una vez pagada la cotización, se da por aceptado el producto o servicio.", { x: 50, y: startY, size: fontSize, font, color: PDFLib.rgb(0, 0, 0), maxWidth: 400, lineHeight: 12 });
+        startY -= 30;
 
-        // Agregar productos en la tabla con restricciones de espacio
-        let totalSubtotalY = startY; // Variable para ajustar la posición del total
+        // Dibujar la tabla
+        const tableTop = startY;
+        const tableHeaders = ["Descripción", "Cantidad", "Unidad", "Precio", "Subtotal"];
+        const headerX = [50, 200, 300, 380, 460];
+        const headerWidth = [150, 50, 50, 80, 80];
+        let rowY = tableTop;
 
+        // Dibujar encabezados
+        tableHeaders.forEach((header, i) => {
+          page.drawText(header, { x: headerX[i], y: rowY, size: fontSize, font, color: PDFLib.rgb(1, 1, 1), backgroundColor: PDFLib.rgb(0.7, 0, 0), maxWidth: headerWidth[i] });
+        });
+        rowY -= 15;  // Después de los encabezados
+
+        // Dibujar las filas
         for (const p of productos) {
-          if (startY < 100) break; // evita escribir sobre el pie del PDF
-          
-          // Añadir el salto de línea en Descripción después de 50 caracteres
-          let descripcionPartes = [];
-          while (p.descripcion.length > 50) {
-            descripcionPartes.push(p.descripcion.substring(0, 50));
-            p.descripcion = p.descripcion.substring(50);
-          }
-          descripcionPartes.push(p.descripcion);
+          if (rowY < 100) break; // Evitar que sobrepasen el pie del PDF
 
-          // Imprimir cada parte de la descripción en diferentes líneas
-          descripcionPartes.forEach((desc, i) => {
-            page.drawText(desc, { x: 50, y: startY - (i * 12), size: fontSize, font, maxWidth: 250 });
-          });
-
-          page.drawText(p.cantidad.toString(), { x: 320, y: startY, size: fontSize, font });
-          page.drawText(p.unidad, { x: 380, y: startY, size: fontSize, font });
-          page.drawText(`$${p.precio.toFixed(2)}`, { x: 460, y: startY, size: fontSize, font });
-          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: 540, y: startY, size: fontSize, font });
-          startY -= 18;
+          page.drawText(p.descripcion.substring(0, 50), { x: headerX[0], y: rowY, size: fontSize, font, maxWidth: headerWidth[0] });
+          page.drawText(p.cantidad.toString(), { x: headerX[1], y: rowY, size: fontSize, font });
+          page.drawText(p.unidad, { x: headerX[2], y: rowY, size: fontSize, font });
+          page.drawText(`$${p.precio.toFixed(2)}`, { x: headerX[3], y: rowY, size: fontSize, font });
+          page.drawText(`$${p.subtotal.toFixed(2)}`, { x: headerX[4], y: rowY, size: fontSize, font });
+          rowY -= 18;  // Separación entre filas
         }
 
-        // Ajuste del total (debe ir al final de las partidas, y no sobresalir)
+        // Calcular y mostrar el total
         const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
-
-        // Calcular el IVA si corresponde
-        const iva = confirm("¿La cotización incluye IVA?");
-        const totalConIva = iva ? total * 1.16 : total; // 16% IVA
-        page.drawText(`TOTAL: $${totalConIva.toFixed(2)}`, { x: 400, y: startY - 30, size: fontSize + 1, font });
+        page.drawText(`TOTAL: $${total.toFixed(2)}`, { x: 400, y: rowY - 20, size: fontSize + 1, font });
 
         const pdfBytes = await pdfDoc.save();
         const blob = new Blob([pdfBytes], { type: "application/pdf" });
