@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Generador de Cotizaciones</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <title>Cotizador Formal PDF</title>
+  <script src="https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,7 +12,9 @@
       padding: 20px;
       color: #111;
     }
-
+    h1 {
+      color: #b00000;
+    }
     .container {
       background: white;
       border-radius: 8px;
@@ -21,36 +23,27 @@
       margin: auto;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
-
     input, select {
       padding: 10px;
       margin: 5px 0;
       width: 100%;
       box-sizing: border-box;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 15px;
     }
-
     th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
+      border: 1px solid #ccc;
+      padding: 10px;
       text-align: left;
       word-break: break-word;
     }
-
     th {
       background: #b00000;
       color: white;
     }
-
-    h1, h3 {
-      color: #b00000;
-    }
-
     .btn {
       background: #b00000;
       color: white;
@@ -58,196 +51,178 @@
       margin-top: 10px;
       border: none;
       cursor: pointer;
-      width: 100%;
     }
-
     .btn:hover {
       background: #900000;
     }
-
-    @media (max-width: 600px) {
-      input, select, button {
-        width: 100%;
+    @media screen and (max-width: 600px) {
+      .container {
+        padding: 10px;
       }
-    }
-
-    /* Ocultamos el div del PDF en pantalla */
-    #plantillaPDF {
-      display: none;
-    }
-
-    .pdf-header {
-      margin-bottom: 20px;
-    }
-
-    .pdf-header td {
-      font-weight: bold;
-      padding: 5px;
-    }
-
-    .pdf-total {
-      margin-top: 15px;
-      font-weight: bold;
-      text-align: right;
-    }
-
-    .pdf-nota {
-      margin-top: 10px;
-      font-size: 0.9em;
-      color: #555;
+      table, thead, tbody, th, td, tr {
+        font-size: 12px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Generador de Cotizaciones</h1>
-    <input type="text" id="cliente" placeholder="Nombre del Cliente" />
-    <input type="date" id="fecha" />
-    <label><input type="checkbox" id="conIVA" /> Incluir IVA (16%)</label>
+<div class="container">
+  <h1>Generador de Cotizaciones</h1>
+  <input type="text" id="cliente" placeholder="Nombre del Cliente" />
+  <input type="date" id="fecha" />
 
-    <h3>Agregar Producto o Servicio</h3>
-    <input type="text" id="descripcion" placeholder="Descripción" />
-    <input type="number" id="cantidad" placeholder="Cantidad" />
-    <input type="text" id="unidad" placeholder="Unidad (ej. pieza, m2, kg)" />
-    <input type="number" id="precio" placeholder="Precio Unitario" />
-    <button class="btn" onclick="agregarProducto()">Agregar</button>
+  <label>
+    <input type="checkbox" id="incluyeIVA"> ¿Incluir IVA (16%)?
+  </label>
 
-    <table id="tabla">
-      <thead>
-        <tr>
-          <th>Descripción</th>
-          <th>Cantidad</th>
-          <th>Unidad</th>
-          <th>Precio</th>
-          <th>Subtotal</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+  <h3>Agregar Producto/Servicio</h3>
+  <input type="text" id="descripcion" placeholder="Descripción" />
+  <input type="number" id="cantidad" placeholder="Cantidad" />
+  <input type="text" id="unidad" placeholder="Unidad (ej. pieza, m2, kg)" />
+  <input type="number" id="precio" placeholder="Precio Unitario" />
+  <button class="btn" onclick="agregarProducto()">Agregar</button>
 
-    <h3 id="total"></h3>
-    <p>Una vez pagada la cotización, se da por aceptado el producto o servicio.</p>
-    <button class="btn" onclick="generarPDF()">Descargar Cotización Formal</button>
-  </div>
-
-  <!-- PLANTILLA QUE SE EXPORTA AL PDF -->
-  <div id="plantillaPDF">
-    <h2 style="text-align: center;">Cotización</h2>
-    <table class="pdf-header">
+  <table id="tablaHTML">
+    <thead>
       <tr>
-        <td>Cliente:</td>
-        <td id="pdfCliente"></td>
-        <td>Fecha:</td>
-        <td id="pdfFecha"></td>
+        <th>Descripción</th>
+        <th>Cantidad</th>
+        <th>Unidad</th>
+        <th>Precio</th>
+        <th>Subtotal</th>
       </tr>
-    </table>
-    <table>
-      <thead>
-        <tr>
-          <th>Descripción</th>
-          <th>Cantidad</th>
-          <th>Unidad</th>
-          <th>Precio</th>
-          <th>Subtotal</th>
-        </tr>
-      </thead>
-      <tbody id="pdfTabla"></tbody>
-    </table>
-    <div class="pdf-total" id="pdfTotal"></div>
-    <div class="pdf-nota">Una vez pagada la cotización, se da por aceptado el producto o servicio.</div>
-  </div>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-  <script>
-    let productos = [];
+  <h3 id="total"></h3>
+  <button class="btn" onclick="generarPDF()">Descargar PDF</button>
+</div>
 
-    function agregarProducto() {
-      const descripcion = document.getElementById("descripcion").value;
-      const cantidad = parseFloat(document.getElementById("cantidad").value);
-      const unidad = document.getElementById("unidad").value;
-      const precio = parseFloat(document.getElementById("precio").value);
+<!-- PDF ZONA -->
+<div id="pdf-area" style="display:none; padding: 20px; font-family: Arial;">
+  <h2 style="color:#b00000;">Cotización</h2>
+  <table>
+    <tr>
+      <td style="font-weight:bold;">Cliente:</td>
+      <td id="pdf-cliente"></td>
+      <td style="font-weight:bold;">Fecha:</td>
+      <td id="pdf-fecha"></td>
+    </tr>
+  </table>
 
-      if (!descripcion || !cantidad || !unidad || !precio) {
-        alert("Faltan datos");
-        return;
-      }
+  <table style="margin-top: 20px;">
+    <thead>
+      <tr style="background-color: #b00000; color: white;">
+        <th>Descripción</th>
+        <th>Cantidad</th>
+        <th>Unidad</th>
+        <th>Precio</th>
+        <th>Subtotal</th>
+      </tr>
+    </thead>
+    <tbody id="pdf-body"></tbody>
+  </table>
 
-      const subtotal = cantidad * precio;
-      productos.push({ descripcion, cantidad, unidad, precio, subtotal });
+  <h3 id="pdf-total" style="margin-top: 20px;"></h3>
+</div>
 
-      const fila = `
-        <tr>
-          <td>${descripcion}</td>
-          <td>${cantidad}</td>
-          <td>${unidad}</td>
-          <td>$${precio.toFixed(2)}</td>
-          <td>$${subtotal.toFixed(2)}</td>
-        </tr>`;
-      document.querySelector("#tabla tbody").innerHTML += fila;
+<script>
+  let productos = [];
 
-      document.getElementById("descripcion").value = "";
-      document.getElementById("cantidad").value = "";
-      document.getElementById("unidad").value = "";
-      document.getElementById("precio").value = "";
+  function agregarProducto() {
+    const descripcion = document.getElementById("descripcion").value;
+    const cantidad = parseFloat(document.getElementById("cantidad").value);
+    const unidad = document.getElementById("unidad").value;
+    const precio = parseFloat(document.getElementById("precio").value);
 
-      actualizarTotal();
+    if (!descripcion || !cantidad || !unidad || !precio) {
+      alert("Faltan datos");
+      return;
     }
 
-    function actualizarTotal() {
-      const conIVA = document.getElementById("conIVA").checked;
-      const subtotal = productos.reduce((acc, p) => acc + p.subtotal, 0);
-      const iva = conIVA ? subtotal * 0.16 : 0;
-      const total = subtotal + iva;
+    const subtotal = cantidad * precio;
+    productos.push({ descripcion, cantidad, unidad, precio, subtotal });
 
-      document.getElementById("total").innerText = `Total: $${total.toFixed(2)} ${conIVA ? '(Incluye IVA)' : ''}`;
+    const row = `<tr>
+      <td>${descripcion}</td>
+      <td>${cantidad}</td>
+      <td>${unidad}</td>
+      <td>$${precio.toFixed(2)}</td>
+      <td>$${subtotal.toFixed(2)}</td>
+    </tr>`;
+
+    document.querySelector("#tablaHTML tbody").innerHTML += row;
+    actualizarTotal();
+
+    document.getElementById("descripcion").value = "";
+    document.getElementById("cantidad").value = "";
+    document.getElementById("unidad").value = "";
+    document.getElementById("precio").value = "";
+  }
+
+  function actualizarTotal() {
+    const total = productos.reduce((sum, p) => sum + p.subtotal, 0);
+    document.getElementById("total").innerText = `Total: $${total.toFixed(2)}`;
+  }
+
+  function generarPDF() {
+    if (productos.length === 0) {
+      alert("Agrega al menos un producto o servicio");
+      return;
     }
 
-    function generarPDF() {
-      const cliente = document.getElementById("cliente").value;
-      const fecha = document.getElementById("fecha").value;
-      const conIVA = document.getElementById("conIVA").checked;
+    const cliente = document.getElementById("cliente").value;
+    const fecha = document.getElementById("fecha").value;
+    const incluirIVA = document.getElementById("incluyeIVA").checked;
 
-      if (!cliente || !fecha || productos.length === 0) {
-        alert("Faltan datos para generar la cotización.");
-        return;
-      }
-
-      // Llenar plantilla PDF
-      document.getElementById("pdfCliente").innerText = cliente;
-      document.getElementById("pdfFecha").innerText = fecha;
-
-      const cuerpo = document.getElementById("pdfTabla");
-      cuerpo.innerHTML = "";
-
-      let subtotal = 0;
-
-      productos.forEach(p => {
-        subtotal += p.subtotal;
-        cuerpo.innerHTML += `
-          <tr>
-            <td>${p.descripcion}</td>
-            <td>${p.cantidad}</td>
-            <td>${p.unidad}</td>
-            <td>$${p.precio.toFixed(2)}</td>
-            <td>$${p.subtotal.toFixed(2)}</td>
-          </tr>`;
-      });
-
-      const iva = conIVA ? subtotal * 0.16 : 0;
-      const total = subtotal + iva;
-
-      document.getElementById("pdfTotal").innerText = `Total: $${total.toFixed(2)} ${conIVA ? '(Incluye IVA)' : ''}`;
-
-      const element = document.getElementById("plantillaPDF");
-      const opt = {
-        margin: 0.5,
-        filename: `cotizacion_${cliente.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-      };
-
-      html2pdf().set(opt).from(element).save();
+    if (!cliente || !fecha) {
+      alert("Faltan datos del cliente o fecha");
+      return;
     }
-  </script>
+
+    document.getElementById("pdf-cliente").innerText = cliente;
+    document.getElementById("pdf-fecha").innerText = fecha;
+
+    const cuerpoTabla = document.getElementById("pdf-body");
+    cuerpoTabla.innerHTML = "";
+    let total = 0;
+
+    productos.forEach(p => {
+      const fila = document.createElement("tr");
+      fila.innerHTML = `
+        <td>${p.descripcion}</td>
+        <td>${p.cantidad}</td>
+        <td>${p.unidad}</td>
+        <td>$${p.precio.toFixed(2)}</td>
+        <td>$${p.subtotal.toFixed(2)}</td>
+      `;
+      cuerpoTabla.appendChild(fila);
+      total += p.subtotal;
+    });
+
+    if (incluirIVA) {
+      const iva = total * 0.16;
+      total += iva;
+    }
+
+    document.getElementById("pdf-total").innerText = `TOTAL: $${total.toFixed(2)}`;
+
+    const pdfArea = document.getElementById("pdf-area");
+    pdfArea.style.display = "block";
+
+    const opt = {
+      margin: 0.5,
+      filename: `cotizacion_${cliente}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    html2pdf().from(pdfArea).set(opt).save().then(() => {
+      pdfArea.style.display = "none";
+    });
+  }
+</script>
 </body>
 </html>
